@@ -1,11 +1,12 @@
 from time import sleep
+from dataclasses import dataclass
+import pickle
+import argparse
+
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.by import By
 from selenium.common import exceptions
-from dataclasses import dataclass
-import pickle
-import config
 
 
 @dataclass
@@ -57,64 +58,73 @@ def scroll_down(times=3):
         html_.send_keys(Keys.PAGE_DOWN)
 
 
-login = config.login
-password = config.password
-browser = webdriver.Chrome('chromedriver.exe')
-browser.get('https://passport.yandex.ru/auth')
+def main(login, password):
+    browser = webdriver.Chrome('chromedriver.exe')
+    global browser
+    browser.get('https://passport.yandex.ru/auth')
 
-login_field = find_element(browser, By.ID, 'passp-field-login')
-login_field.send_keys(login)
+    login_field = find_element(browser, By.ID, 'passp-field-login')
+    login_field.send_keys(login)
 
-button = find_element(browser, By.CLASS_NAME, 'passp-sign-in-button')
-button = find_element(button, By.CLASS_NAME, 'passp-form-button')
-button.click()
+    button = find_element(browser, By.CLASS_NAME, 'passp-sign-in-button')
+    button = find_element(button, By.CLASS_NAME, 'passp-form-button')
+    button.click()
 
-password_field = find_element(browser, By.ID, 'passp-field-passwd')
-password_field.send_keys(password)
+    password_field = find_element(browser, By.ID, 'passp-field-passwd')
+    password_field.send_keys(password)
 
-button = find_element(browser, By.CLASS_NAME, 'passp-sign-in-button')
-button = find_element(button, By.CLASS_NAME, 'passp-form-button')
-button.click()
+    button = find_element(browser, By.CLASS_NAME, 'passp-sign-in-button')
+    button = find_element(button, By.CLASS_NAME, 'passp-form-button')
+    button.click()
 
-sleep(10)  # Wait for redirect to passp.yandex.ru
+    sleep(10)  # Wait for redirect to passp.yandex.ru
 
-nickname = find_element(browser, By.CLASS_NAME, 'personal-info-login__displaylogin').text
-browser.get(f'https://music.yandex.ru/users/{nickname}/history')
+    nickname = find_element(browser, By.CLASS_NAME, 'personal-info-login__displaylogin').text
+    browser.get(f'https://music.yandex.ru/users/{nickname}/history')
 
-res = []
-data_b_in_res = []
+    res = []
+    data_b_in_res = []
 
-flag = True
+    flag = True
 
-while flag:
-    tracks = find_elements(browser, By.CLASS_NAME, 'd-track')
-    flag = False
+    while flag:
+        tracks = find_elements(browser, By.CLASS_NAME, 'd-track')
+        flag = False
 
-    try:
-        for track in tracks:
-            data_b = int(get_attribute(track, 'data-b'))
+        try:
+            for track in tracks:
+                data_b = int(get_attribute(track, 'data-b'))
 
-            if data_b not in data_b_in_res:
-                flag = True
+                if data_b not in data_b_in_res:
+                    flag = True
 
-                data_b_in_res.append(data_b)
+                    data_b_in_res.append(data_b)
 
-                name = find_element(track, By.CLASS_NAME, 'd-track__name')
-                track_name = get_attribute(name, 'title')
-                url_track = get_attribute(find_element(name, By.TAG_NAME, 'a'), 'href')
+                    name = find_element(track, By.CLASS_NAME, 'd-track__name')
+                    track_name = get_attribute(name, 'title')
+                    url_track = get_attribute(find_element(name, By.TAG_NAME, 'a'), 'href')
 
-                artist = find_element(find_element(track, By.CLASS_NAME, 'd-track__artists'), By.TAG_NAME, 'a')
-                track_artist = get_attribute(artist, 'title')
-                url_artist = get_attribute(artist, 'href')
+                    artist = find_element(find_element(track, By.CLASS_NAME, 'd-track__artists'), By.TAG_NAME, 'a')
+                    track_artist = get_attribute(artist, 'title')
+                    url_artist = get_attribute(artist, 'href')
 
-                res.append(Track(data_b=data_b,
-                                 track_name=track_name,
-                                 track_artist=track_artist,
-                                 url_track=url_track,
-                                 url_artist=url_artist))
-    except Exception:
-        pass
-    scroll_down(10)
+                    res.append(Track(data_b=data_b,
+                                     track_name=track_name,
+                                     track_artist=track_artist,
+                                     url_track=url_track,
+                                     url_artist=url_artist))
+        except Exception:
+            pass
+        scroll_down(10)
 
-with open('res.pkl', 'wb') as f:
-    pickle.dump(res, f)
+    with open('res.pkl', 'wb') as f:
+        pickle.dump(res, f)
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--login', help='Your yandex login', type=str, required=True)
+    parser.add_argument('--password', help='Your yandex password', type=str, required=True)
+    args = parser.parse_args()
+
+    main(args.login, args.password)
