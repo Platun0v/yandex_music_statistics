@@ -58,9 +58,7 @@ def scroll_down(times=3):
         html_.send_keys(Keys.PAGE_DOWN)
 
 
-def main(login, password):
-    browser = webdriver.Chrome('chromedriver.exe')
-    global browser
+def auth(login, password):
     browser.get('https://passport.yandex.ru/auth')
 
     login_field = find_element(browser, By.ID, 'passp-field-login')
@@ -79,9 +77,10 @@ def main(login, password):
 
     sleep(10)  # Wait for redirect to passp.yandex.ru
 
-    nickname = find_element(browser, By.CLASS_NAME, 'personal-info-login__displaylogin').text
-    browser.get(f'https://music.yandex.ru/users/{nickname}/history')
+    return find_element(browser, By.CLASS_NAME, 'personal-info-login__displaylogin').text
 
+
+def get_data():
     res = []
     data_b_in_res = []
 
@@ -117,6 +116,14 @@ def main(login, password):
             pass
         scroll_down(10)
 
+    return res
+
+
+def main(login, password):
+    nickname = auth(login, password)
+    browser.get(f'https://music.yandex.ru/users/{nickname}/history')
+    res = get_data()
+
     with open('res.pkl', 'wb') as f:
         pickle.dump(res, f)
 
@@ -127,4 +134,5 @@ if __name__ == '__main__':
     parser.add_argument('--password', help='Your yandex password', type=str, required=True)
     args = parser.parse_args()
 
+    browser = webdriver.Chrome('chromedriver.exe')
     main(args.login, args.password)
