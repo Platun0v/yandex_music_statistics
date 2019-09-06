@@ -45,6 +45,11 @@ class Yandex:
                                  'track_id': track_id,
                                  'password': self.password}).json()
 
+        user_data = self.post('/registration-validations/auth/accounts',
+                              data={'csrf_token': csrf_token}).json()
+
+        return user_data
+
     def get(self, url, params=None, **kwargs):
         return self.method('GET', f'{self.main_url}/{url if url[0] != "/" else url[1:]}', params=params, **kwargs)
 
@@ -88,4 +93,4 @@ if __name__ == '__main__':
     # Yandex(args.login, args.password)
     yandex = Yandex(config.login, config.password)
 
-    yandex.auth()
+    print(yandex.auth())
