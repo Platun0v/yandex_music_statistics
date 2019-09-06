@@ -3,7 +3,7 @@ import requests
 import logging
 import sys
 import config
-
+import re
 
 logger = logging.getLogger('Yandex')
 formatter = logging.Formatter(
@@ -14,7 +14,7 @@ console_output_handler = logging.StreamHandler(sys.stderr)
 console_output_handler.setFormatter(formatter)
 logger.addHandler(console_output_handler)
 
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 
 
 class Yandex:
@@ -30,7 +30,20 @@ class Yandex:
         })
 
     def auth(self):
-        pass
+        self.update_main_url('passport.yandex.ru')
+
+        auth_page = self.get('/auth').text
+        csrf_token, process_uuid = self.find_auth_data(auth_page)
+
+        track_id = self.post('/registration-validations/auth/multi_step/start',
+                             data={'csrf_token': csrf_token,
+                                   'process_uuid': process_uuid,
+                                   'login': self.login}).json()['track_id']
+
+        result = self.post('/registration-validations/auth/multi_step/commit_password',
+                           data={'csrf_token': csrf_token,
+                                 'track_id': track_id,
+                                 'password': self.password}).json()
 
     def get(self, url, params=None, **kwargs):
         return self.method('GET', f'{self.main_url}/{url if url[0] != "/" else url[1:]}', params=params, **kwargs)
@@ -53,6 +66,18 @@ class Yandex:
     def update_headers(self, headers):
         self.session.headers.update(headers)
 
+    def update_main_url(self, url):
+        self.main_url = f'https://{url}'
+
+    @staticmethod
+    def find_auth_data(html):
+        csrf_token = re.search('data-csrf="\S*"', html)
+        csrf_token = html[csrf_token.start():csrf_token.end()][11:-1]
+        process_uuid = re.search('process_uuid=\S*"', html)
+        process_uuid = html[process_uuid.start():process_uuid.end()][13:-1]
+
+        return csrf_token, process_uuid
+
 
 if __name__ == '__main__':
     # parser = argparse.ArgumentParser()
@@ -61,6 +86,6 @@ if __name__ == '__main__':
     # args = parser.parse_args()
 
     # Yandex(args.login, args.password)
-    Yandex(config.login, config.password)
+    yandex = Yandex(config.login, config.password)
 
-    Yandex.auth()
+    yandex.auth()
