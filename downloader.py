@@ -1,138 +1,66 @@
-from time import sleep
-from dataclasses import dataclass
-import pickle
 import argparse
-
-from selenium import webdriver
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.common.by import By
-from selenium.common import exceptions
-
-
-@dataclass
-class Track:
-    data_b: int
-    track_name: str
-    track_artist: str
-    url_track: str
-    url_artist: str
+import requests
+import logging
+import sys
+import config
 
 
-def find_element(self, by=By.ID, value=None, timeout=1, attempts=3):
-    for _ in range(attempts):
-        try:
-            elem = self.find_element(by, value)
-            return elem
-        except exceptions.NoSuchElementException:
-            sleep(timeout)
+logger = logging.getLogger('Yandex')
+formatter = logging.Formatter(
+    '%(asctime)s (%(filename)s:%(lineno)d) %(levelname)s - %(name)s: "%(message)s"'
+)
 
-    return self.find_element(by, value)
+console_output_handler = logging.StreamHandler(sys.stderr)
+console_output_handler.setFormatter(formatter)
+logger.addHandler(console_output_handler)
 
-
-def find_elements(self, by=By.ID, value=None, timeout=1, attempts=3):
-    for _ in range(attempts):
-        try:
-            elem = self.find_elements(by, value)
-            return elem
-        except exceptions.NoSuchElementException:
-            sleep(timeout)
-
-    return self.find_elements(by, value)
+logger.setLevel(logging.INFO)
 
 
-def get_attribute(sel_elem, value, timeout=1, attempts=3):
-    for _ in range(attempts):
-        elem = sel_elem.get_attribute(value)
-        if elem:
-            return elem
+class Yandex:
+    main_url = f'https://yandex.ru'
+
+    def __init__(self, login, password):
+        self.login = login
+        self.password = password
+        self.session = requests.Session()
+        self.update_headers({
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                          "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/76.0.3809.100 Safari/537.36",
+        })
+
+    def auth(self):
+        pass
+
+    def get(self, url, params=None, **kwargs):
+        return self.method('GET', f'{self.main_url}/{url if url[0] != "/" else url[1:]}', params=params, **kwargs)
+
+    def post(self, url, data=None, **kwargs):
+        return self.method('POST', f'{self.main_url}/{url if url[0] != "/" else url[1:]}', data=data, **kwargs)
+
+    def method(self, method, url, **kwargs):
+        if method == 'POST':
+            logger.info(f'POST to {url} with {kwargs}')
+            resp = self.session.post(url, **kwargs)
+        elif method == 'GET':
+            logger.info(f'GET to {url} with {kwargs}')
+            resp = self.session.get(url, **kwargs)
         else:
-            scroll_down()
-            sleep(timeout)
+            raise ValueError(f'Unknown method {method}', method)
+        logger.debug(f'Got {resp.text}')
+        return resp
 
-    return sel_elem.get_attribute(value)
-
-
-def scroll_down(times=3):
-    html_ = find_element(browser, By.TAG_NAME, 'html')
-    for _ in range(times):
-        html_.send_keys(Keys.PAGE_DOWN)
-
-
-def auth(login, password):
-    browser.get('https://passport.yandex.ru/auth')
-
-    login_field = find_element(browser, By.ID, 'passp-field-login')
-    login_field.send_keys(login)
-
-    button = find_element(browser, By.CLASS_NAME, 'passp-sign-in-button')
-    button = find_element(button, By.CLASS_NAME, 'passp-form-button')
-    button.click()
-
-    password_field = find_element(browser, By.ID, 'passp-field-passwd')
-    password_field.send_keys(password)
-
-    button = find_element(browser, By.CLASS_NAME, 'passp-sign-in-button')
-    button = find_element(button, By.CLASS_NAME, 'passp-form-button')
-    button.click()
-
-    sleep(10)  # Wait for redirect to passp.yandex.ru
-
-    return find_element(browser, By.CLASS_NAME, 'personal-info-login__displaylogin').text
-
-
-def get_data():
-    res = []
-    data_b_in_res = []
-
-    flag = True
-
-    while flag:
-        tracks = find_elements(browser, By.CLASS_NAME, 'd-track')
-        flag = False
-
-        try:
-            for track in tracks:
-                data_b = int(get_attribute(track, 'data-b'))
-
-                if data_b not in data_b_in_res:
-                    flag = True
-
-                    data_b_in_res.append(data_b)
-
-                    name = find_element(track, By.CLASS_NAME, 'd-track__name')
-                    track_name = get_attribute(name, 'title')
-                    url_track = get_attribute(find_element(name, By.TAG_NAME, 'a'), 'href')
-
-                    artist = find_element(find_element(track, By.CLASS_NAME, 'd-track__artists'), By.TAG_NAME, 'a')
-                    track_artist = get_attribute(artist, 'title')
-                    url_artist = get_attribute(artist, 'href')
-
-                    res.append(Track(data_b=data_b,
-                                     track_name=track_name,
-                                     track_artist=track_artist,
-                                     url_track=url_track,
-                                     url_artist=url_artist))
-        except Exception:
-            pass
-        scroll_down(10)
-
-    return res
-
-
-def main(login, password):
-    nickname = auth(login, password)
-    browser.get(f'https://music.yandex.ru/users/{nickname}/history')
-    res = get_data()
-
-    with open('res.pkl', 'wb') as f:
-        pickle.dump(res, f)
+    def update_headers(self, headers):
+        self.session.headers.update(headers)
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--login', help='Your yandex login', type=str, required=True)
-    parser.add_argument('--password', help='Your yandex password', type=str, required=True)
-    args = parser.parse_args()
+    # parser = argparse.ArgumentParser()
+    # parser.add_argument('--login', help='Your yandex login', type=str, required=True)
+    # parser.add_argument('--password', help='Your yandex password', type=str, required=True)
+    # args = parser.parse_args()
 
-    browser = webdriver.Chrome('chromedriver.exe')
-    main(args.login, args.password)
+    # Yandex(args.login, args.password)
+    Yandex(config.login, config.password)
+
+    Yandex.auth()
