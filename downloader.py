@@ -4,6 +4,7 @@ import logging
 import sys
 import config
 import re
+import dataclasses
 
 logger = logging.getLogger('Yandex')
 formatter = logging.Formatter(
@@ -17,6 +18,21 @@ logger.addHandler(console_output_handler)
 logger.setLevel(logging.DEBUG)
 
 
+@dataclasses.dataclass
+class Track:
+    artist: str
+    artist_id: int
+
+    album: str
+    album_id: int
+
+    track: str
+    track_id: str
+
+    duration_sec: int
+    year: int
+
+
 class Yandex:
     main_url = f'https://yandex.ru'
 
@@ -28,6 +44,8 @@ class Yandex:
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                           "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/76.0.3809.100 Safari/537.36",
         })
+
+        self.tracks_library = {}
 
     def auth(self):
         self.update_main_url('passport.yandex.ru')
@@ -49,6 +67,30 @@ class Yandex:
                               data={'csrf_token': csrf_token}).json()
 
         return user_data
+
+    def get_track_ids(self):
+        self.update_main_url('music.yandex.ru')
+
+        res = self.get('/handlers/library.jsx',
+                         {'owner': self.login, 'filter': 'history', 'likeFilter': 'favorite', 'lang': 'ru',
+                          'external-domain': 'music.yandex.ru', 'overembed': 'false', 'ncrnd': '0.9546193023464256'})
+        tracks = res.json()
+        track_ids = list(map(str, tracks['trackIds']))
+        tracks = tracks['tracks']
+        self.update_library(tracks)
+
+        return track_ids
+
+    def update_library(self, tracks):
+        for track in tracks:
+            track_id = str(track['id'])
+            if self.tracks_library.get(track_id) is None and track['type'] == 'music':
+                self.tracks_library[track_id] = Track(
+                    artist=track['artists'][0]['name'], artist_id=track['artists'][0]['id'],
+                    album=track['albums'][0]['title'], album_id=track['albums'][0]['id'],
+                    track=track['title'], track_id=track_id,
+                    duration_sec=track['durationMs'] // 1000, year=track['albums'][0]['year'],
+                )
 
     def get(self, url, params=None, **kwargs):
         return self.method('GET', f'{self.main_url}/{url if url[0] != "/" else url[1:]}', params=params, **kwargs)
