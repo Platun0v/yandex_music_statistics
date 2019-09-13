@@ -20,21 +20,6 @@ logger.addHandler(console_output_handler)
 logger.setLevel(logging.DEBUG)
 
 
-@dataclasses.dataclass
-class Track:
-    artist: str
-    artist_id: int
-
-    album: str
-    album_id: int
-
-    track: str
-    track_id: str
-
-    duration_sec: int
-    year: int
-
-
 class Yandex:
     main_url = f'https://yandex.ru'
 
@@ -49,6 +34,9 @@ class Yandex:
 
         self.tracks_library = {}
 
+        self.sign = None
+        self.experiments = None
+
     def auth(self):
         self.update_main_url('passport.yandex.ru')
 
@@ -60,10 +48,10 @@ class Yandex:
                                    'process_uuid': process_uuid,
                                    'login': self.login}).json()['track_id']
 
-        result = self.post('/registration-validations/auth/multi_step/commit_password',
-                           data={'csrf_token': csrf_token,
-                                 'track_id': track_id,
-                                 'password': self.password}).json()
+        self.post('/registration-validations/auth/multi_step/commit_password',
+                  data={'csrf_token': csrf_token,
+                        'track_id': track_id,
+                        'password': self.password}).json()
 
         user_data = self.post('/registration-validations/auth/accounts',
                               data={'csrf_token': csrf_token}).json()
@@ -79,49 +67,70 @@ class Yandex:
         tracks = res.json()
         track_ids = list(map(str, tracks['trackIds']))
         tracks = tracks['tracks']
-        self.update_library(tracks)
+        self.update_library(tracks, track_ids[:len(tracks)])
 
         return track_ids
 
-    def update_library(self, tracks):
-        for track in tracks:
+    def update_library(self, tracks, track_ids_old):
+        for track, track_id_old in zip(tracks, track_ids_old):
             track_id = str(track['id'])
-            if self.tracks_library.get(track_id) is None and track['type'] == 'music':
+            if self.tracks_library.get(track_id_old) is None and track['type'] == 'music':
                 album = track['albums'][0] if len(track['albums']) > 0 else None
                 duration_sec = track.get('durationMs') // 1000 if track.get('durationMs') else None
 
-                self.tracks_library[track_id] = Track(
-                    artist=track['artists'][0]['name'], artist_id=track['artists'][0]['id'],
-                    album=album['title'] if album else None, album_id=album['id'] if album else None,
-                    track=track['title'], track_id=track_id,
-                    duration_sec=duration_sec, year=album.get('year') if album else None,
-                )
+                self.tracks_library[track_id_old] = {
+                    'artist': track['artists'][0]['name'], 'artist_id': track['artists'][0]['id'],
+                    'album': album['title'] if album else None, 'album_id': album['id'] if album else None,
+                    'track': track['title'], 'track_id': track_id,
+                    'duration_sec': duration_sec, 'year': album.get('year') if album else None,
+                }
 
     def get_tracks_data(self, track_ids):
-        sign, experiments = self.find_history_data(self.get(f'users/{self.login}/history').text)
+        if self.sign is None:
+            self.sign, self.experiments = self.find_history_data(self.get(f'users/{self.login}/history').text)
         tracks_sm = 250
 
         track_ids = list(set(track_ids))
-        track_ids = [track_ids[tracks_sm * i:tracks_sm * (i + 1)] for i in range(len(set(track_ids)) // tracks_sm)]
+        track_ids = [track_ids[tracks_sm * i:tracks_sm * (i + 1)] for i in range(len(track_ids) // tracks_sm + 1)]
 
         for track_ids_sm in track_ids:
             resp = self.post('/handlers/track-entries.jsx', data={
                 'entries': ','.join(track_ids_sm),
                 'strict': 'true',
                 'lang': 'ru',
-                'sign': sign,
-                'experiments': experiments,
+                'sign': self.sign,
+                'experiments': self.experiments,
                 'external-domain': 'music.yandex.ru',
             }).json()
-            self.update_library(resp)
+            self.update_library(resp, track_ids_sm)
 
             sleep(3)
 
     def download_and_safe_tracks(self):
         track_ids = self.get_track_ids()
         self.get_tracks_data(track_ids)
+        self.save_csv(track_ids)
 
-        logger.info(len(self.tracks_library))
+    def save_csv(self, track_ids):
+        with open('statistics.csv', 'wb') as f:
+            f_line = True
+            i = 0
+
+            for track_id in track_ids:
+                track_data = []
+                if self.tracks_library.get(track_id) is None:
+                    print(track_id)
+                    i += 1
+                    continue
+
+                if f_line:
+                    f.write((','.join(self.tracks_library[track_id].keys()) + '\n').encode())
+                    f_line = False
+
+                for key in self.tracks_library[track_id]:
+                    track_data.append(f'"{self.tracks_library[track_id][key]}"')
+                f.write((','.join(track_data) + '\n').encode())
+            print(i)
 
     def get(self, url, params=None, **kwargs):
         return self.method('GET', f'{self.main_url}/{url if url[0] != "/" else url[1:]}', params=params, **kwargs)
@@ -149,9 +158,9 @@ class Yandex:
 
     @staticmethod
     def find_auth_data(html):
-        csrf_token = re.search('data-csrf="\S*?"', html)
+        csrf_token = re.search('data-csrf=".*?"', html)
         csrf_token = html[csrf_token.start():csrf_token.end()][11:-1]
-        process_uuid = re.search('process_uuid=\S*?"', html)
+        process_uuid = re.search('process_uuid=.*?"', html)
         process_uuid = html[process_uuid.start():process_uuid.end()][13:-1]
 
         return csrf_token, process_uuid
