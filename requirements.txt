@@ -1,4 +1,5 @@
-jupyter==1.0.0
-matplotlib==3.1.1
-numpy==1.16.5
-pandas==0.25.1
+requests
+jupyter
+matplotlib
+numpy
+pandas
