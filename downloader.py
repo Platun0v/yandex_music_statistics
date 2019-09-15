@@ -1,12 +1,10 @@
 import argparse
 from time import sleep
-
 import requests
 import logging
 import sys
 import config
 import re
-import dataclasses
 
 logger = logging.getLogger('Yandex')
 formatter = logging.Formatter(
@@ -83,6 +81,7 @@ class Yandex:
                     'album': album['title'] if album else None, 'album_id': album['id'] if album else None,
                     'track': track['title'], 'track_id': track_id,
                     'duration_sec': duration_sec, 'year': album.get('year') if album else None,
+                    'genre': album.get('genre') if album else None,
                 }
 
     def get_tracks_data(self, track_ids):
@@ -114,13 +113,10 @@ class Yandex:
     def save_csv(self, track_ids):
         with open('statistics.csv', 'wb') as f:
             f_line = True
-            i = 0
 
             for track_id in track_ids:
                 track_data = []
                 if self.tracks_library.get(track_id) is None:
-                    print(track_id)
-                    i += 1
                     continue
 
                 if f_line:
@@ -130,7 +126,6 @@ class Yandex:
                 for key in self.tracks_library[track_id]:
                     track_data.append(f'"{self.tracks_library[track_id][key]}"')
                 f.write((','.join(track_data) + '\n').encode())
-            print(i)
 
     def get(self, url, params=None, **kwargs):
         return self.method('GET', f'{self.main_url}/{url if url[0] != "/" else url[1:]}', params=params, **kwargs)
