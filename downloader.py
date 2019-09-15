@@ -15,7 +15,11 @@ console_output_handler = logging.StreamHandler(sys.stderr)
 console_output_handler.setFormatter(formatter)
 logger.addHandler(console_output_handler)
 
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.WARN)
+
+
+class AuthError(Exception):
+    pass
 
 
 class Yandex:
@@ -41,15 +45,20 @@ class Yandex:
         auth_page = self.get('/auth').text
         csrf_token, process_uuid = self.find_auth_data(auth_page)
 
-        track_id = self.post('/registration-validations/auth/multi_step/start',
-                             data={'csrf_token': csrf_token,
-                                   'process_uuid': process_uuid,
-                                   'login': self.login}).json()['track_id']
+        auth_login = self.post('/registration-validations/auth/multi_step/start',
+                               data={'csrf_token': csrf_token,
+                                     'process_uuid': process_uuid,
+                                     'login': self.login}).json()
+        if auth_login['status'] == 'error':
+            raise AuthError(f'Got error {auth_login["errors"]}')
 
-        self.post('/registration-validations/auth/multi_step/commit_password',
-                  data={'csrf_token': csrf_token,
-                        'track_id': track_id,
-                        'password': self.password}).json()
+        auth_password = self.post('/registration-validations/auth/multi_step/commit_password',
+                                  data={'csrf_token': csrf_token,
+                                        'track_id': auth_login['track_data'],
+                                        'password': self.password}).json()
+
+        if auth_password['status'] == 'error':
+            raise AuthError(f'Got error {auth_password["errors"]}')
 
         user_data = self.post('/registration-validations/auth/accounts',
                               data={'csrf_token': csrf_token}).json()
