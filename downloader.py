@@ -180,12 +180,12 @@ class Yandex:
 
 
 if __name__ == '__main__':
-    # parser = argparse.ArgumentParser()
-    # parser.add_argument('--login', help='Your yandex login', type=str, required=True)
-    # parser.add_argument('--password', help='Your yandex password', type=str, required=True)
-    # args = parser.parse_args()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--login', help='Your yandex login', type=str, required=True)
+    parser.add_argument('--password', help='Your yandex password', type=str, required=True)
+    args = parser.parse_args()
 
-    # Yandex(args.login, args.password)
-    yandex = Yandex(config.login, config.password)
+    yandex = Yandex(args.login, args.password)
+    # yandex = Yandex(config.login, config.password)
     yandex.auth()
     yandex.download_and_safe_tracks()
