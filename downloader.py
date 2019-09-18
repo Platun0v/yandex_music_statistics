@@ -54,7 +54,7 @@ class Yandex:
 
         auth_password = self.post('/registration-validations/auth/multi_step/commit_password',
                                   data={'csrf_token': csrf_token,
-                                        'track_id': auth_login['track_data'],
+                                        'track_id': auth_login['track_id'],
                                         'password': self.password}).json()
 
         if auth_password['status'] == 'error':
