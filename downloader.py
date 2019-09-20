@@ -133,6 +133,8 @@ class Yandex:
                     f_line = False
 
                 for key in self.tracks_library[track_id]:
+                    if type(self.tracks_library[track_id][key]) is str:
+                        self.tracks_library[track_id][key] = self.tracks_library[track_id][key].replace('"', '""')
                     track_data.append(f'"{self.tracks_library[track_id][key]}"')
                 f.write((','.join(track_data) + '\n').encode())
 
@@ -186,6 +188,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     yandex = Yandex(args.login, args.password)
+
     # yandex = Yandex(config.login, config.password)
     yandex.auth()
     yandex.download_and_safe_tracks()
