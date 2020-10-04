@@ -9,7 +9,7 @@
 ## Использование
 
 ### Сбор данных
-`python downloder.py --login=login --password=password`
+`python downloader.py --login=login --password=password`
 
 ### Пример обработки данных
 Пример статистики можно посмотреть в ноутбуке _statistics.ipynb_
