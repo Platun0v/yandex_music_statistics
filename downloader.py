@@ -3,7 +3,6 @@ from time import sleep
 import requests
 import logging
 import sys
-import config
 import re
 
 logger = logging.getLogger('Yandex')
@@ -49,6 +48,7 @@ class Yandex:
                                data={'csrf_token': csrf_token,
                                      'process_uuid': process_uuid,
                                      'login': self.login}).json()
+
         if auth_login['status'] == 'error':
             raise AuthError(f'Got error {auth_login["errors"]}')
 
@@ -68,10 +68,14 @@ class Yandex:
     def get_track_ids(self):
         self.update_main_url('music.yandex.ru')
 
+        self.update_headers({
+            "Referer": f"https://music.yandex.ru/users/{self.login}/history"
+        })
         res = self.get('/handlers/library.jsx',
                        {'owner': self.login, 'filter': 'history', 'likeFilter': 'favorite', 'lang': 'ru',
                         'external-domain': 'music.yandex.ru', 'overembed': 'false', 'ncrnd': '0.9546193023464256'})
         tracks = res.json()
+
         track_ids = list(map(str, tracks['trackIds']))
         tracks = tracks['tracks']
         self.update_library(tracks, track_ids[:len(tracks)])
@@ -114,7 +118,7 @@ class Yandex:
 
             sleep(3)
 
-    def download_and_safe_tracks(self):
+    def download_and_save_tracks(self):
         track_ids = self.get_track_ids()
         self.get_tracks_data(track_ids)
         self.save_csv(track_ids)
@@ -145,6 +149,7 @@ class Yandex:
         return self.method('POST', f'{self.main_url}/{url if url[0] != "/" else url[1:]}', data=data, **kwargs)
 
     def method(self, method, url, **kwargs):
+        logger.debug(f'Headers: {self.session.headers}')
         if method == 'POST':
             logger.info(f'POST to {url} with {kwargs}')
             resp = self.session.post(url, **kwargs)
@@ -164,8 +169,8 @@ class Yandex:
 
     @staticmethod
     def find_auth_data(html):
-        csrf_token = re.search('data-csrf=".*?"', html)
-        csrf_token = html[csrf_token.start():csrf_token.end()][11:-1]
+        csrf_token = re.search('"csrf":".*?"', html)
+        csrf_token = html[csrf_token.start():csrf_token.end()][8:-1]
         process_uuid = re.search('process_uuid=.*?"', html)
         process_uuid = html[process_uuid.start():process_uuid.end()][13:-1]
 
@@ -189,6 +194,8 @@ if __name__ == '__main__':
 
     yandex = Yandex(args.login, args.password)
 
+    # import config
     # yandex = Yandex(config.login, config.password)
+
     yandex.auth()
-    yandex.download_and_safe_tracks()
+    yandex.download_and_save_tracks()
